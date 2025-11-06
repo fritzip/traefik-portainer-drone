@@ -1,16 +1,63 @@
 # Dynamic configuration
 http:
+  services:
+    error-pages:
+      loadBalancer:
+        servers:
+          - url: "http://error_pages:5000"
+
   middlewares:
+    serve-pretty-errors:
+      errors:
+        status:
+          - "400-599"
+        service: error-pages
+        query: "/{status}.html"
+
     nofloc:
       headers:
         customResponseHeaders:
           Permissions-Policy: "interest-cohort=()"
 
+    # Redirect to add trailing slash
     trailing-slash:
       redirectregex:
         regex: "^(https?://[^/]+/[a-z0-9_]+)$"
         replacement: "${1}/"
         permanent: true
+
+    # Rate limiting - prevents spam/DOS
+    rate-limit:
+      rateLimit:
+        average: 100 # requests per second
+        burst: 50 # burst capacity
+        period: 1s
+
+    # Stricter rate limit for auth endpoints
+    rate-limit-auth:
+      rateLimit:
+        average: 5
+        burst: 10
+        period: 1m
+
+    # Security headers
+    security-headers:
+      headers:
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        sslRedirect: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+
+    # Complete protection chain with errors
+    default-chain:
+      chain:
+        middlewares:
+          - serve-pretty-errors
+          - rate-limit
+          - security-headers
 
 tls:
   # certificates:

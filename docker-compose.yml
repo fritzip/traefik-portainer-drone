@@ -1,8 +1,6 @@
-version: "3.9"
-
 services:
   traefik:
-    image: traefik:v2.11
+    image: traefik:latest
     container_name: traefik
     restart: always
     security_opt:
@@ -17,11 +15,15 @@ services:
       - "--providers.file.watch=true"
       - "--log.level=INFO"
       - "--log.format=common"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.format=json"
       - "--entryPoints.web.address=:80"
       - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
       - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
       - "--entryPoints.websecure.address=:443"
       - "--entryPoints.websecure.http.tls.certResolver=letsencrypt"
+      - "--entryPoints.websecure.http.middlewares=default-chain@file"
       - "--certificatesResolvers.letsencrypt.acme.email=${USER_EMAIL}"
       - "--certificatesResolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
       - "--certificatesResolvers.letsencrypt.acme.keyType=EC384"
@@ -35,34 +37,23 @@ services:
       - ./traefik-config/acme.json:/etc/traefik/acme.json
       - ./traefik-config/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - ./traefik-config/certs:/etc/certs:ro
+      - /var/log/traefik:/var/log/traefik
     networks:
       - proxy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_USERNAME}:${TRAEFIK_PASSWORD}"
       - "traefik.http.routers.traefik.middlewares=traefik-auth"
-      - "traefik.http.routers.traefik.service=api@internal"
 
   error_pages:
     image: ttrafelet/traefik_error_pages
     container_name: error_pages
     restart: always
-    expose:
-      - "5000"
     networks:
       - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.error-pages.entrypoints=websecure"
-      - "traefik.http.routers.error-pages.rule=HostRegexp(`{catchall:.*}`)"
-      - "traefik.http.middlewares.serve-pretty-errors.errors.status=400-599"
-      - "traefik.http.middlewares.serve-pretty-errors.errors.service=error-pages"
-      - "traefik.http.middlewares.serve-pretty-errors.errors.query=/{status}.html"
-      - "traefik.http.services.error-pages.loadbalancer.server.port=5000"
-      - "traefik.http.routers.error-pages.service=error-pages"
-      - "traefik.http.routers.error-pages.priority=1"
 
   portainer:
     image: portainer/portainer-ce:latest
@@ -80,57 +71,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN_NAME}`)"
-      - "traefik.http.routers.portainer.service=portainer"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
-
-  drone:
-    image: drone/drone:2
-    container_name: drone
-    restart: unless-stopped
-    depends_on:
-      - traefik
-    environment:
-      - DRONE_SERVER_HOST=drone.${DOMAIN_NAME}
-      - DRONE_SERVER_PROTO=https
-      - DRONE_RPC_SECRET=${DRONE_RPC_SECRET}
-      - DRONE_GITHUB_SERVER=https://github.com
-      - DRONE_GITHUB_CLIENT_ID=${DRONE_GITHUB_CLIENT_ID}
-      - DRONE_GITHUB_CLIENT_SECRET=${DRONE_GITHUB_CLIENT_SECRET}
-      - DRONE_RUNNER_NAME=drone-runner-1
-      - DRONE_LOGS_TEXT=true
-      - DRONE_LOGS_PRETTY=true
-      - DRONE_LOGS_COLOR=true
-      - DRONE_ADMIN=${DRONE_GITHUB_USER}
-      - DRONE_USER_CREATE=username:${DRONE_GITHUB_USER},admin:true
-    ports:
-      - 8000:80
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./drone-data:/data
-    networks:
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.drone.entrypoints=websecure"
-      - "traefik.http.routers.drone.rule=Host(`drone.${DOMAIN_NAME}`)"
-
-  drone-runner-1:
-    image: drone/drone-runner-docker:1
-    container_name: drone-runner-1
-    restart: unless-stopped
-    depends_on:
-      drone:
-        condition: service_started
-    environment:
-      - DRONE_RPC_PROTO=https
-      - DRONE_RPC_HOST=drone.${DOMAIN_NAME}
-      - DRONE_RPC_SECRET=${DRONE_RPC_SECRET}
-      - DRONE_RUNNER_CAPACITY=2
-      - DRONE_RUNNER_NAME=drone-runner-1
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - proxy
 
 networks:
   proxy:
