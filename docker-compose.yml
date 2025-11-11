@@ -1,13 +1,17 @@
 services:
+  # Main Traefik proxy with host networking for real client IPs
   traefik:
     image: traefik:latest
     container_name: traefik
     restart: always
+    network_mode: host
     security_opt:
       - no-new-privileges:true
     command:
       - "--global.sendAnonymousUsage=false"
       - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--entryPoints.api.address=:8080"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.watch=true"
       - "--providers.docker.exposedByDefault=false"
@@ -28,9 +32,6 @@ services:
       - "--certificatesResolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
       - "--certificatesResolvers.letsencrypt.acme.keyType=EC384"
       - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
-    ports:
-      - 80:80
-      - 443:443
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -38,20 +39,22 @@ services:
       - ./traefik-config/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - ./traefik-config/certs:/etc/certs:ro
       - /var/log/traefik:/var/log/traefik
-    networks:
-      - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.entrypoints=websecure"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN_NAME}`)"
-      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.constraint-label=public"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_USERNAME}:${TRAEFIK_PASSWORD}"
-      - "traefik.http.routers.traefik.middlewares=traefik-auth"
+      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
 
   error_pages:
     image: ttrafelet/traefik_error_pages
     container_name: error_pages
     restart: always
+    ports:
+      - "5001:5000"
     networks:
       - proxy
 
@@ -69,8 +72,10 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
+      - "traefik.constraint-label=public"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
 networks:

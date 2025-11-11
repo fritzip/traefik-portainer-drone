@@ -4,8 +4,8 @@ http:
     error-pages:
       loadBalancer:
         servers:
-          - url: "http://error_pages:5000"
-
+          - url: "http://localhost:5001"
+          
   middlewares:
     serve-pretty-errors:
       errors:
@@ -39,6 +39,13 @@ http:
         average: 5
         burst: 10
         period: 1m
+
+    # Very aggressive rate limiting for testing
+    test-rate-limit:
+      rateLimit:
+        average: 5 # only 5 requests per second
+        burst: 10 # only 10 burst capacity
+        period: 1s
 
     # Security headers
     security-headers:
