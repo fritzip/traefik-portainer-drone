@@ -30,8 +30,10 @@ http:
     rate-limit:
       rateLimit:
         average: 100 # requests per second
-        burst: 50 # burst capacity
+        burst: 200 # burst capacity
         period: 1s
+        sourceCriterion:
+          requestHost: true # Rate limit per host, not globally
 
     # Stricter rate limit for auth endpoints
     rate-limit-auth:

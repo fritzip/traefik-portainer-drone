@@ -41,7 +41,6 @@ services:
       - /var/log/traefik:/var/log/traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.constraint-label=public"
       - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
       - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN_NAME}`)"
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
