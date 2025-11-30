@@ -1,5 +1,12 @@
 # Dynamic configuration
 http:
+  serversTransports:
+    nextcloud-transport:
+      forwardingTimeouts:
+        dialTimeout: "60s"
+        responseHeaderTimeout: "7200s"
+        idleConnTimeout: "7200s"
+
   services:
     error-pages:
       loadBalancer:
@@ -13,7 +20,7 @@ http:
           - "400-599"
         service: error-pages
         query: "/{status}.html"
-
+    
     nofloc:
       headers:
         customResponseHeaders:
@@ -68,6 +75,13 @@ http:
           - rate-limit
           - security-headers
 
+    # Chain without error pages for auth-protected services
+    auth-chain:
+      chain:
+        middlewares:
+          - rate-limit
+          - security-headers
+      
 tls:
   # certificates:
   #   - certFile: "/etc/certs/local-cert.pem"

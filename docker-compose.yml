@@ -26,8 +26,11 @@ services:
       - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
       - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
       - "--entryPoints.websecure.address=:443"
+      - "--entryPoints.websecure.http.middlewares=auth-chain@file"
       - "--entryPoints.websecure.http.tls.certResolver=letsencrypt"
-      - "--entryPoints.websecure.http.middlewares=default-chain@file"
+      - "--entryPoints.websecure.transport.respondingTimeouts.readTimeout=7200s"
+      - "--entryPoints.websecure.transport.respondingTimeouts.writeTimeout=7200s"
+      - "--entryPoints.websecure.transport.respondingTimeouts.idleTimeout=1800s"
       - "--certificatesResolvers.letsencrypt.acme.email=${USER_EMAIL}"
       - "--certificatesResolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
       - "--certificatesResolvers.letsencrypt.acme.keyType=EC384"
@@ -47,6 +50,7 @@ services:
       - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_USERNAME}:${TRAEFIK_PASSWORD}"
       - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
+      - "traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080"
 
   error_pages:
     image: ttrafelet/traefik_error_pages
@@ -71,10 +75,10 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.constraint-label=public"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN_NAME}`)"
       - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.portainer.middlewares=serve-pretty-errors@file"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
 networks:
