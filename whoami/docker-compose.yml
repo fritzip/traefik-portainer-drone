@@ -5,13 +5,14 @@ services:
     image: traefik/whoami
     container_name: whoami
     networks:
-      - proxy
+      - traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.whoami.entrypoints=websecure"
       - "traefik.http.routers.whoami.rule=Host(`whoami.${DOMAIN_NAME:-docker.localhost}`)"
-      - "traefik.http.routers.whoami.middlewares=serve-pretty-errors"
+      - "traefik.http.routers.whoami.tls=true"
+      - "traefik.http.routers.whoami.middlewares=serve-pretty-errors@file"
 
 networks:
-  proxy:
+  traefik:
     external: true

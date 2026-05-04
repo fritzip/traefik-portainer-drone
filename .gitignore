@@ -1,5 +1,4 @@
 portainer-data/
-drone-data/
 *.pem
 traefik-config/acme.json
 .env

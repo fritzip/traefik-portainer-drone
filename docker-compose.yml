@@ -1,18 +1,28 @@
 services:
-  # Main Traefik proxy with host networking for real client IPs
+  # Main Traefik proxy.
+  # This base configuration uses mkcert local certificates (no ACME) and explicit port
+  # mappings, which work correctly with Docker Desktop / WSL2.
+  # For production on a real VPS (host networking + Let's Encrypt), use:
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
   traefik:
     image: traefik:latest
     container_name: traefik
     restart: always
-    network_mode: host
     security_opt:
       - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    networks:
+      - traefik
     command:
       - "--global.sendAnonymousUsage=false"
       - "--api.dashboard=true"
       - "--api.insecure=false"
       - "--entryPoints.api.address=:8080"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.network=traefik"
       - "--providers.docker.watch=true"
       - "--providers.docker.exposedByDefault=false"
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
@@ -26,29 +36,27 @@ services:
       - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
       - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
       - "--entryPoints.websecure.address=:443"
+      - "--entryPoints.websecure.asDefault=true"
+      - "--entryPoints.websecure.http.tls=true"
       - "--entryPoints.websecure.http.middlewares=auth-chain@file"
-      - "--entryPoints.websecure.http.tls.certResolver=letsencrypt"
       - "--entryPoints.websecure.transport.respondingTimeouts.readTimeout=7200s"
       - "--entryPoints.websecure.transport.respondingTimeouts.writeTimeout=7200s"
       - "--entryPoints.websecure.transport.respondingTimeouts.idleTimeout=1800s"
-      - "--certificatesResolvers.letsencrypt.acme.email=${USER_EMAIL}"
-      - "--certificatesResolvers.letsencrypt.acme.storage=/etc/traefik/acme.json"
-      - "--certificatesResolvers.letsencrypt.acme.keyType=EC384"
-      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik-config/acme.json:/etc/traefik/acme.json
       - ./traefik-config/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - ./traefik-config/certs:/etc/certs:ro
       - /var/log/traefik:/var/log/traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN_NAM\
+        E:-docker.localhost}`)"
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_USERNAME}:${TRAEFIK_PASSWORD}"
+      - "traefik.http.routers.traefik-dashboard.tls=true"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_USERNA\
+        ME}:${TRAEFIK_PASSWORD}"
       - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
       - "traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080"
 
@@ -57,9 +65,11 @@ services:
     container_name: error_pages
     restart: always
     ports:
-      - "5001:5000"
+      - "5551:5000"
+    tmpfs:
+      - /home/flask
     networks:
-      - proxy
+      - traefik
 
   portainer:
     image: portainer/portainer-ce:latest
@@ -72,15 +82,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./portainer-data:/data
     networks:
-      - proxy
+      - traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.portainer.entrypoints=websecure"
-      - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN_NAME}`)"
-      - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN_NAME:-doc\
+        ker.localhost}`)"
+      - "traefik.http.routers.portainer.tls=true"
       - "traefik.http.routers.portainer.middlewares=serve-pretty-errors@file"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
 networks:
-  proxy:
+  traefik:
     external: true
