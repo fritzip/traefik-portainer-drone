@@ -11,7 +11,7 @@ http:
     error-pages:
       loadBalancer:
         servers:
-          - url: "http://localhost:5001"
+          - url: "http://error_pages:5000"
           
   middlewares:
     serve-pretty-errors:
@@ -83,11 +83,11 @@ http:
           - security-headers
       
 tls:
-  # certificates:
-  #   - certFile: "/etc/certs/local-cert.pem"
-  #     keyFile: "/etc/certs/local-key.pem"
-  #     stores:
-  #       - default
+  # Local mkcert certificates — used when no certresolver is set (local mode).
+  # In production mode these are ignored for routers that use certresolver=letsencrypt.
+  certificates:
+    - certFile: "/etc/certs/local-cert.pem"
+      keyFile: "/etc/certs/local-key.pem"
   options:
     default:
       cipherSuites:
